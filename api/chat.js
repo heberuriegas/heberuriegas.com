@@ -62,7 +62,7 @@ export default async function handler(req) {
 
   try {
     const result = await generateText({
-      model: google("gemini-2.0-flash"),
+      model: google("gemini-2.5-flash"),
       system: `${SYSTEM_PROMPT}\n${contextPrefix}`,
       messages: [...messages, { role: "user", content: message }],
       temperature: 0.6,
