@@ -1,5 +1,5 @@
 import { streamText } from "ai";
-import { google } from "@ai-sdk/google";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 export const config = {
   runtime: "edge",
@@ -52,14 +52,26 @@ export default async function handler(req) {
 
   const contextPrefix = visitorName ? `Visitor name: ${visitorName}.` : "Visitor name unknown.";
   const messages = normalizeHistory(body.history);
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
-  const result = streamText({
-    model: google("gemini-2.0-flash"),
-    system: `${SYSTEM_PROMPT}\n${contextPrefix}`,
-    messages: [...messages, { role: "user", content: message }],
-    temperature: 0.6,
-    maxTokens: 220,
-  });
+  if (!apiKey) {
+    return new Response("Missing GEMINI_API_KEY in Vercel environment.", { status: 500 });
+  }
 
-  return result.toTextStreamResponse();
+  const google = createGoogleGenerativeAI({ apiKey });
+
+  try {
+    const result = streamText({
+      model: google("gemini-2.0-flash"),
+      system: `${SYSTEM_PROMPT}\n${contextPrefix}`,
+      messages: [...messages, { role: "user", content: message }],
+      temperature: 0.6,
+      maxTokens: 220,
+    });
+
+    return result.toTextStreamResponse();
+  } catch (error) {
+    console.error("Chat route error", error);
+    return new Response("AI is temporarily unavailable. Please try again.", { status: 500 });
+  }
 }
