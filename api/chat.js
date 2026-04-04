@@ -75,6 +75,11 @@ export default async function handler(req) {
     });
   } catch (error) {
     console.error("Chat route error", error);
+    const message = String(error?.message || "").toLowerCase();
+    if (message.includes("quota") || message.includes("resource_exhausted") || message.includes("429")) {
+      return new Response("Gemini quota reached. Please try again later or upgrade API quota.", { status: 429 });
+    }
+
     return new Response("AI is temporarily unavailable. Please try again.", { status: 500 });
   }
 }
