@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@ai-sdk/google": "^1.2.8",
+    "ai": "^4.3.16"
+  },
+  "name": "heberuriegas-com",
+  "private": true,
+  "scripts": {
+    "dev": "python3 -m http.server 4173 --bind 127.0.0.1"
+  },
+  "type": "module",
+  "version": "1.0.0"
+}
