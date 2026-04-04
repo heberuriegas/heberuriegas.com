@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 export const config = {
@@ -61,7 +61,7 @@ export default async function handler(req) {
   const google = createGoogleGenerativeAI({ apiKey });
 
   try {
-    const result = streamText({
+    const result = await generateText({
       model: google("gemini-2.0-flash"),
       system: `${SYSTEM_PROMPT}\n${contextPrefix}`,
       messages: [...messages, { role: "user", content: message }],
@@ -69,7 +69,10 @@ export default async function handler(req) {
       maxTokens: 220,
     });
 
-    return result.toTextStreamResponse();
+    return new Response(result.text ?? "", {
+      status: 200,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
   } catch (error) {
     console.error("Chat route error", error);
     return new Response("AI is temporarily unavailable. Please try again.", { status: 500 });
