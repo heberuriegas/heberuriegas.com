@@ -1,11 +1,22 @@
 import { generateText } from "ai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 
 export const config = {
   runtime: "edge",
 };
 
-const SYSTEM_PROMPT = `You are Heber Uriegas' personal terminal assistant on his website.
+const SYSTEM_PROMPT = `
+You are the Heber's website.
+
+Goal:
+Your goal is provide concise and relevant information about Heber's background, values,
+projects, and vision. You should also be able to answer questions about Heber's
+experience, contact information, and how to navigate the website.
+
+In the first message response you must tell people can do with you and what they can ask. For example,
+you can say "Hi, I'm Heber's website! You can ask me about Heber's background, values,
+projects, vision, or contact information. You can also ask for help to see available commands.
 
 Tone:
 - Warm, concise, mission-driven.
@@ -24,7 +35,8 @@ Behavior:
 - If user asks identity questions, answer directly in first person.
 - If user asks for contact, share the email.
 - If unknown, be honest and suggest checking the website sections.
-- Never claim access to private data.`;
+- Never claim access to private data.
+`;
 
 function normalizeHistory(history) {
   if (!Array.isArray(history)) {
@@ -32,10 +44,96 @@ function normalizeHistory(history) {
   }
 
   return history
-    .filter((item) => item && typeof item.role === "string" && typeof item.content === "string")
+    .filter(
+      (item) =>
+        item &&
+        typeof item.role === "string" &&
+        typeof item.content === "string",
+    )
     .slice(-8)
     .map((item) => ({ role: item.role, content: item.content }));
 }
+
+const COMMAND_MAP = {
+  about: "Opening /about -> mission and founder story.",
+  experience: "Opening /experience -> Seals AI, Orchata, Prysmex.",
+  values:
+    "Opening /values -> passion, curiosity, ingenuity, hard work, integrity.",
+  projects: "Opening /projects -> featured work and impact statements.",
+  future: "Opening /future -> roadmap and next initiatives.",
+  contact: "Opening /contact -> reach me at mail@heberuriegas.com.",
+  help: "You can chat naturally. Optional commands: about, experience, values, projects, future, contact, clear",
+  clear: "Terminal cleared.",
+};
+
+function parseCommand(message) {
+  const normalized = String(message || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^\.\//, "")
+    .replace(/^\//, "");
+
+  if (COMMAND_MAP[normalized]) {
+    return normalized;
+  }
+
+  return "";
+}
+
+const AgentState = Annotation.Root({
+  message: Annotation(),
+  history: Annotation(),
+  visitorName: Annotation(),
+  apiKey: Annotation(),
+  intent: Annotation({ default: () => "chat" }),
+  command: Annotation({ default: () => "" }),
+  response: Annotation({ default: () => "" }),
+});
+
+const agentGraph = new StateGraph(AgentState)
+  .addNode("classify_intent", async (state) => {
+    const command = parseCommand(state.message);
+    if (command) {
+      return { intent: "command", command };
+    }
+    return { intent: "chat", command: "" };
+  })
+  .addNode("command_agent", async (state) => {
+    return {
+      response:
+        COMMAND_MAP[state.command] || "Type help to see available commands.",
+    };
+  })
+  .addNode("chat_agent", async (state) => {
+    const contextPrefix = state.visitorName
+      ? `Visitor name: ${state.visitorName}.`
+      : "Visitor name unknown.";
+
+    const groq = createOpenAI({
+      apiKey: state.apiKey,
+      baseURL: "https://api.groq.com/openai/v1",
+    });
+
+    const result = await generateText({
+      model: groq("llama-3.1-8b-instant"),
+      system: `${SYSTEM_PROMPT}\n${contextPrefix}`,
+      messages: [...state.history, { role: "user", content: state.message }],
+      temperature: 0.6,
+      maxTokens: 220,
+    });
+
+    return { response: result.text ?? "" };
+  })
+  .addEdge(START, "classify_intent")
+  .addConditionalEdges("classify_intent", (state) => {
+    if (state.intent === "command") {
+      return "command_agent";
+    }
+    return "chat_agent";
+  })
+  .addEdge("command_agent", END)
+  .addEdge("chat_agent", END)
+  .compile();
 
 export default async function handler(req) {
   if (req.method !== "POST") {
@@ -44,42 +142,50 @@ export default async function handler(req) {
 
   const body = await req.json().catch(() => ({}));
   const message = typeof body.message === "string" ? body.message.trim() : "";
-  const visitorName = typeof body.visitorName === "string" ? body.visitorName.trim() : "";
+  const visitorName =
+    typeof body.visitorName === "string" ? body.visitorName.trim() : "";
 
   if (!message) {
     return new Response("Message is required", { status: 400 });
   }
 
-  const contextPrefix = visitorName ? `Visitor name: ${visitorName}.` : "Visitor name unknown.";
   const messages = normalizeHistory(body.history);
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
 
   if (!apiKey) {
-    return new Response("Missing GEMINI_API_KEY in Vercel environment.", { status: 500 });
+    return new Response("Missing GROQ_API_KEY in Vercel environment.", {
+      status: 500,
+    });
   }
 
-  const google = createGoogleGenerativeAI({ apiKey });
-
   try {
-    const result = await generateText({
-      model: google("gemini-2.5-flash"),
-      system: `${SYSTEM_PROMPT}\n${contextPrefix}`,
-      messages: [...messages, { role: "user", content: message }],
-      temperature: 0.6,
-      maxTokens: 220,
+    const result = await agentGraph.invoke({
+      message,
+      history: messages,
+      visitorName,
+      apiKey,
     });
 
-    return new Response(result.text ?? "", {
+    return new Response(result.response ?? "", {
       status: 200,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   } catch (error) {
     console.error("Chat route error", error);
     const message = String(error?.message || "").toLowerCase();
-    if (message.includes("quota") || message.includes("resource_exhausted") || message.includes("429")) {
-      return new Response("Gemini quota reached. Please try again later or upgrade API quota.", { status: 429 });
+    if (
+      message.includes("quota") ||
+      message.includes("resource_exhausted") ||
+      message.includes("429")
+    ) {
+      return new Response(
+        "Groq quota reached. Please try again later or check your plan limits.",
+        { status: 429 },
+      );
     }
 
-    return new Response("AI is temporarily unavailable. Please try again.", { status: 500 });
+    return new Response("AI is temporarily unavailable. Please try again.", {
+      status: 500,
+    });
   }
 }
