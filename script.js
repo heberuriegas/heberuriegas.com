@@ -701,10 +701,6 @@ if (terminalOutput && window.Terminal && window.FitAddon) {
   async function executeInput(raw) {
     const normalized = raw.replace(/^\.\//, "").toLowerCase();
 
-    if (typeof window.rotateBackgroundTheme === "function") {
-      window.rotateBackgroundTheme();
-    }
-
     if (normalized === "cancel") {
       if (activeIntake || pendingServiceChoice) {
         activeIntake = null;
