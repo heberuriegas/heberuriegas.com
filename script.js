@@ -150,9 +150,35 @@ if (terminalOutput && window.Terminal && window.FitAddon) {
   const fitAddon = new window.FitAddon.FitAddon();
   term.loadAddon(fitAddon);
   term.open(terminalOutput);
-  fitAddon.fit();
 
-  window.addEventListener("resize", () => fitAddon.fit());
+  let fitFrame = 0;
+  function fitTerminal() {
+    if (fitFrame) {
+      cancelAnimationFrame(fitFrame);
+    }
+    fitFrame = requestAnimationFrame(() => {
+      fitAddon.fit();
+      fitFrame = 0;
+    });
+  }
+
+  fitTerminal();
+  window.addEventListener("resize", fitTerminal);
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fitTerminal);
+  }
+
+  if (window.ResizeObserver) {
+    const terminalResizeObserver = new window.ResizeObserver(() => fitTerminal());
+    terminalResizeObserver.observe(terminalOutput);
+  }
+
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => fitTerminal()).catch(() => {});
+  }
+
+  setTimeout(() => fitTerminal(), 120);
 
   const prompt = "\x1b[36myou\x1b[0m> ";
   let buffer = "";

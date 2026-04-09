@@ -295,6 +295,10 @@ p {
 .terminal {
   max-width: 980px;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   background: var(--terminal-bg);
   border: 0;
   border-radius: 14px;
@@ -756,22 +760,51 @@ p {
   }
 
   .terminal-intro {
+    height: 100svh;
+    min-height: 100svh;
     padding-top: calc(0.8rem + env(safe-area-inset-top));
     padding-bottom: calc(0.8rem + env(safe-area-inset-bottom));
+    gap: 0.45rem;
+    overflow: hidden;
+  }
+
+  .intro-avatar-wrap {
+    margin-top: 0.35rem;
+    margin-bottom: 0.35rem;
   }
 
   .hero-photo {
-    width: 170px;
-    height: 170px;
+    width: 148px;
+    height: 148px;
     border-radius: 50%;
   }
 
   .terminal-main {
     max-width: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+    align-self: stretch;
+    width: 100%;
+    max-height: none;
+  }
+
+  .terminal {
+    flex: 1 1 auto;
+    height: 100%;
   }
 
   .terminal-screen {
     min-height: 0;
+    height: auto;
+    max-height: none;
+  }
+
+  .xterm-shell {
+    padding: 0.72rem 0.45rem 0.14rem;
+  }
+
+  .intro-hint {
+    margin-top: 0.08rem;
   }
 
   .terminal-screen p,
@@ -818,11 +851,17 @@ p {
     padding-right: 0.65rem;
     padding-top: calc(0.75rem + env(safe-area-inset-top));
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    gap: 0.4rem;
+  }
+
+  .intro-avatar-wrap {
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
   }
 
   .hero-photo {
-    width: 144px;
-    height: 144px;
+    width: 132px;
+    height: 132px;
   }
 
   .terminal-topbar p {
@@ -831,7 +870,13 @@ p {
 
   .terminal-screen {
     min-height: 0;
+    height: auto;
+    max-height: none;
     padding: 0.35rem;
+  }
+
+  .xterm-shell {
+    padding: 0.6rem 0.38rem 0.1rem;
   }
 
   .intro-hint {
@@ -852,8 +897,8 @@ p {
   }
 
   .hero-photo {
-    width: 126px;
-    height: 126px;
+    width: 116px;
+    height: 116px;
   }
 
   .terminal {
@@ -877,6 +922,8 @@ p {
 
   .terminal-screen {
     min-height: 0;
+    height: auto;
+    max-height: none;
     padding: 0.25rem;
   }
 
